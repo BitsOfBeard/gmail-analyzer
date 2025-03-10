@@ -8,7 +8,7 @@ from pathlib import Path
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from prettytable import PrettyTable
+import email.utils
 
 # Configuration constants
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -17,17 +17,12 @@ CSV_FILENAME = 'email_analysis.csv'
 
 PICKLE_FILENAME = 'processed_ids.pickle'
 
-# Update these constants at the top
-CREDENTIALS_PICKLE = 'gmail_token.pickle'  # Separate file for auth credentials
-PROCESSED_IDS_PICKLE = 'processed_ids.pickle'  # Only for message IDs
-
-
 def get_gmail_service():
     """Authenticate and return Gmail API service instance."""
     creds = None
     try:
-        if os.path.exists(CREDENTIALS_PICKLE):
-            with open(CREDENTIALS_PICKLE, 'rb') as token:
+        if os.path.exists('gmail_token.pickle'):
+            with open('gmail_token.pickle', 'rb') as token:
                 creds = pickle.load(token)
 
         if not creds or not creds.valid:
@@ -38,7 +33,7 @@ def get_gmail_service():
                     raise FileNotFoundError("'credentials.json' file not found.")
                 flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
                 creds = flow.run_local_server(port=0)
-            with open(CREDENTIALS_PICKLE, 'wb') as token:
+            with open('gmail_token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
 
         return build('gmail', 'v1', credentials=creds)
@@ -66,49 +61,31 @@ def analyze_message(service, user_id, msg_id):
             userId=user_id,
             id=msg_id,
             format='metadata',
-            metadataHeaders=['From', 'Subject']
+            metadataHeaders=['From']
         ).execute()
 
         headers = message.get('payload', {}).get('headers', [])
         sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown')
-        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
-        labels = message.get('labelIds', [])
 
         sender_name, sender_email = extract_sender_info(sender)
-        return sender_name, sender_email, subject, labels
+        return sender_name, sender_email, sender
     except Exception as error:
         print(f"Error analyzing message {msg_id}: {error}")
-        return None, None, None, []
+        return None, None, None
 
 def extract_sender_info(sender):
-    """Extract sender name and email from From header."""
-    email_match = re.search(r'<?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)>?', sender)
-    name_match = re.search(r'^"?([^"<]+)"?\s*<', sender)
+    """Extract sender name and email using email.utils.parseaddr."""
+    name, email_address = email.utils.parseaddr(sender)
+    name = name.strip() if name else None
 
-    sender_email = email_match.group(1) if email_match else ''
-    sender_name = name_match.group(1).strip() if name_match else sender.replace(sender_email, '').strip(' <>')
-
-    return sender_name, sender_email
-
-def categorize_service(subject, labels):
-    """Categorize emails using Gmail labels and subject analysis."""
-    label_map = {
-        'CATEGORY_PERSONAL': 'Personal',
-        'CATEGORY_SOCIAL': 'Social',
-        'CATEGORY_PROMOTIONS': 'Promotions',
-        'CATEGORY_UPDATES': 'Updates',
-        'CATEGORY_FORUMS': 'Forums'
-    }
-
-    for label, category in label_map.items():
-        if label in labels:
-            return category
-
-    subscription_keywords = {'subscription', 'newsletter', 'welcome', 'account'}
-    if any(keyword in subject.lower() for keyword in subscription_keywords):
-        return 'Subscription'
-
-    return 'Data Holder'
+    # Validate email
+    email_regex = re.compile(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$', re.IGNORECASE)
+    valid_email = None
+    if email_address:
+        email_address = email_address.strip().lower()
+        if email_regex.match(email_address):
+            valid_email = email_address
+    return name, valid_email
 
 def load_processed_data():
     """Load both processed IDs and CSV data with integrity checks."""
@@ -132,10 +109,9 @@ def load_processed_data():
             with open(CSV_FILENAME, 'r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    key = (row['Email Address'].strip(), row['Service/Company Name'].strip())
+                    key = (row['Email Address'].strip().lower(), row['Service/Company Name'].strip().lower())
                     csv_data[key] = {
                         'count': int(row['count']),
-                        'type': row['Type'],
                         'first_seen': row.get('first_seen', datetime.now().isoformat()),
                         'last_seen': row.get('last_seen', datetime.now().isoformat())
                     }
@@ -159,7 +135,6 @@ def save_data(processed_ids, csv_data):
         writer = csv.DictWriter(f, fieldnames=[
             'Service/Company Name', 
             'Email Address', 
-            'Type', 
             'count',
             'first_seen',
             'last_seen'
@@ -169,27 +144,23 @@ def save_data(processed_ids, csv_data):
             writer.writerow({
                 'Service/Company Name': name,
                 'Email Address': email,
-                'Type': data['type'],
                 'count': data['count'],
                 'first_seen': data['first_seen'],
                 'last_seen': data['last_seen']
             })
     os.replace(temp_csv, CSV_FILENAME)
 
-def update_csv_data(csv_data, sender_name, sender_email, service_type):
+def update_csv_data(csv_data, sender_name, sender_email):
     """Update CSV data with new entry."""
     current_time = datetime.now().isoformat()
-    key = (sender_email.strip().lower(), sender_name.strip())
+    key = (sender_email.strip().lower(), sender_name.strip().lower() if sender_name else "Unknown")
 
     if key in csv_data:
         csv_data[key]['count'] += 1
         csv_data[key]['last_seen'] = current_time
-        if csv_data[key]['type'] != service_type:
-            csv_data[key]['type'] = f"{csv_data[key]['type']}|{service_type}"
     else:
         csv_data[key] = {
             'count': 1,
-            'type': service_type,
             'first_seen': current_time,
             'last_seen': current_time
         }
@@ -230,10 +201,14 @@ def main():
                 if msg_id in processed_ids:
                     continue
 
-                sender_name, sender_email, subject, labels = analyze_message(service, 'me', msg_id)
-                if sender_name:
-                    service_type = categorize_service(subject, labels)
-                    csv_data = update_csv_data(csv_data, sender_name, sender_email, service_type)
+                sender_name, sender_email, sender_header = analyze_message(service, 'me', msg_id)
+                reason = []
+                if not sender_email:
+                    reason.append('missing email')
+
+                # Track emails based on email address
+                if sender_email:
+                    csv_data = update_csv_data(csv_data, sender_name, sender_email)
 
                 processed_ids.add(msg_id)
                 total_processed += 1
@@ -245,7 +220,7 @@ def main():
         print("\nOperation interrupted by user")
     finally:
         save_data(processed_ids, csv_data)
-        print(f"Processed {total_processed} new emails. Total tracked: {len(csv_data)}")
+        print(f"Processed {total_processed} new emails. Total unique senders: {len(csv_data)}")
 
 if __name__ == '__main__':
     main()

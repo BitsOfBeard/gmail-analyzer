@@ -35,7 +35,7 @@ This Python script connects to your Gmail account using the Gmail API to analyze
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/gmail-analyzer.git
+git clone https://github.com/BitsOfBeard/gmail-analyzer.git
 cd gmail-analyzer
 ```
 

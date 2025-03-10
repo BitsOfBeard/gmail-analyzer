@@ -1,164 +1,131 @@
 # Gmail Analyzer Script
 
-This Python script connects to your Gmail account using the Gmail API to analyze and categorize your emails. It processes emails in batches, allowing you to scan your entire mailbox over multiple runs. The script outputs a table summarizing the services or companies that have sent you emails, along with the type of communication and the number of emails received.
+This Python script connects to your Gmail account using the Gmail API to analyze and categorize your emails. It processes emails in batches, allowing you to scan your entire mailbox over multiple runs. Results are stored in a CSV file for external analysis.
 
 ## Features
 
-- **Batch Processing**: Processes emails in user-defined batches to manage execution time and resources.
-- **Email Categorization**: Categorizes emails into Personal, Social, Promotions, Updates, Forums, Subscription, or Data Holder.
-- **Sender Analysis**: Extracts sender information and counts the number of emails from each sender.
-- **Progress Persistence**: Remembers processed emails between runs to avoid duplication.
-- **Customizable**: Easily adjust batch sizes and categories as needed.
+- **Batch Processing**: Processes emails in user-defined batches (default: 1000/run)
+- **Email Categorization**: Categorizes emails using Gmail labels and content analysis
+- **Persistent Tracking**: Maintains processing state between runs
+- **CSV Export**: Generates `email_analysis.csv` with sender statistics
+- **Safe Authentication**: OAuth 2.0 with separate credential storage
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
 - [Setup Instructions](#setup-instructions)
-  1. [Clone the Repository](#1-clone-the-repository)
-  2. [Create a Virtual Environment](#2-create-a-virtual-environment)
-  3. [Activate the Virtual Environment](#3-activate-the-virtual-environment)
-  4. [Install Dependencies](#4-install-dependencies)
-  5. [Obtain Google API Credentials](#5-obtain-google-api-credentials)
-  6. [Run the Script](#6-run-the-script)
 - [Configuration](#configuration)
 - [Usage](#usage)
+- [Viewing Results](#viewing-results)
 - [Important Notes](#important-notes)
 - [License](#license)
 
 ## Prerequisites
 
-- Python 3.6 or higher
-- A Google account with Gmail enabled
+- Python 3.6+
+- Google account with Gmail enabled
 - Internet connection
 
 ## Setup Instructions
 
 ### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/BitsOfBeard/gmail-analyzer.git
 cd gmail-analyzer
 ```
 
-### 2. Create a Virtual Environment
-
-Create a virtual environment to manage dependencies.
-
-On macOS/Linux:
-
+### 2. Create Virtual Environment
 ```bash
-python3 -m venv venv
+python3 -m venv venv  # macOS/Linux
+python -m venv venv   # Windows
 ```
 
-On Windows:
-
+### 3. Activate Environment
 ```bash
-python -m venv venv
-```
-
-### 3. Activate the Virtual Environment
-
-On macOS/Linux:
-
-```bash
-source venv/bin/activate
-```
-
-On Windows:
-
-```bash
-venv\Scripts\activate
+source venv/bin/activate  # macOS/Linux
+venv\Scripts\activate    # Windows
 ```
 
 ### 4. Install Dependencies
-
-Install the required Python packages using pip.
-
 ```bash
 pip install -r requirements.txt
 ```
 
-Contents of `requirements.txt`:
+### 5. Configure Google API
+1. Create project in [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Gmail API
+3. Create OAuth 2.0 Desktop credentials
+4. Download as `credentials.json` to project root
 
-```
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-prettytable
-```
-
-### 5. Obtain Google API Credentials
-
-#### a. Set Up a Project in Google Cloud Console
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project or select an existing one.
-3. Enable the Gmail API for your project:
-   - Navigate to **APIs & Services > Library**.
-   - Search for **Gmail API** and click **Enable**.
-
-#### b. Create OAuth 2.0 Credentials
-
-1. Go to **APIs & Services > Credentials**.
-2. Click **Create Credentials** and select **OAuth client ID**.
-3. Choose **Desktop app** as the application type.
-4. Name your client (e.g., "Gmail Analyzer") and click **Create**.
-5. Click **Download JSON** to get your `credentials.json` file.
-6. Place the `credentials.json` file in the root directory of the cloned repository.
-
-> **Important**: Do not share your `credentials.json` file or upload it to any public repository.
-
-### 6. Run the Script
-
-With everything set up, you can run the script:
-
+### 6. First Run
 ```bash
 python gmail_analyzer.py
+# Follow browser authentication prompts
 ```
-
-On the first run, a browser window will open for you to authorize the application.
-After authorization, the script will begin processing your emails in batches.
 
 ## Configuration
 
-You can adjust the batch size by modifying the `BATCH_SIZE` variable in the script:
-
+Edit these constants in the script:
 ```python
-BATCH_SIZE = 1000  # Number of emails to process per run
+BATCH_SIZE = 1000  # Emails per run
+CSV_FILENAME = 'email_analysis.csv'  # Output file
 ```
 
 ## Usage
 
-- **Incremental Processing**: Run the script multiple times to process all emails. It will pick up where it left off.
-- **Viewing Results**: After each run, the script outputs a table of the services and a summary of categories.
-- **Resetting Progress**: To start over, delete the `processed_ids.pickle` file.
+```bash
+# Process next batch
+python gmail_analyzer.py --batch-size 500
+
+# Check progress
+python gmail_analyzer.py --export-only
+```
+
+## Viewing Results
+
+The CSV file contains:
+- Service/company name
+- Email address
+- Communication type
+- Email count
+- First/last seen timestamps
+
+**Analysis methods**:
+```bash
+# Terminal preview
+column -s, -t < email_analysis.csv | less -#2 -N -S
+
+# Spreadsheet
+open email_analysis.csv  # macOS
+start email_analysis.csv  # Windows
+
+# Python/Pandas
+import pandas as pd
+df = pd.read_csv('email_analysis.csv')
+print(df.sort_values('count', ascending=False).head(10))
+```
 
 ## Important Notes
 
-### Sensitive Information
+### File Management
+| File                   | Purpose                                | Security  |
+|------------------------|----------------------------------------|-----------|
+| `credentials.json`    | Google API credentials                 | 🔒 Secret |
+| `gmail_token.pickle`  | Encrypted session tokens               | 🔒 Secret |
+| `processed_ids.pickle`| Tracked email IDs                      | 🔐 Private|
+| `email_analysis.csv`   | Aggregated sender stats                | 🔐 Private|
 
-- `credentials.json`: Contains your OAuth 2.0 Client ID and Client Secret. Do not commit this file to any public repository.
-- `token.pickle`: Stores your access and refresh tokens after authorization. This file should also be kept private.
+### Maintenance
+```bash
+# Reset processing
+rm processed_ids.pickle
 
-### .gitignore File
-
-Ensure that sensitive files are excluded from version control by adding them to your `.gitignore` file:
-
+# Full reset
+rm gmail_token.pickle processed_ids.pickle email_analysis.csv
 ```
-credentials.json
-token.pickle
-processed_ids.pickle
-```
 
-### API Quotas and Limits
-
-Be mindful of Gmail API usage limits to avoid exceeding quotas.
-For more information, refer to the [Gmail API Usage Limits](https://developers.google.com/gmail/api/reference/quota).
-
-### Privacy Considerations
-
-The script processes your personal emails. Ensure that any output data is handled securely.
-Review and comply with Google's [API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
+### Security
+- Never commit `*.pickle` or `credentials.json`
+- Revoke access at [Google Security Settings](https://myaccount.google.com/permissions)
 
 ## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+MIT License - See [LICENSE](LICENSE)

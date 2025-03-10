@@ -1,13 +1,13 @@
-# Gmail Analyzer Script
+# Gmail Source Analyzer Script
 
-This Python script connects to your Gmail account using the Gmail API to analyze and categorize your emails. It processes emails in batches, allowing you to scan your entire mailbox over multiple runs. Results are stored in a CSV file for external analysis.
+This Python script connects to your Gmail account using the Gmail API to analyze and identify the primary sources of your emails. It processes emails in batches, allowing you to scan your entire mailbox over multiple runs. Results are stored in a CSV file for external analysis.
 
 ## Features
 
 - **Batch Processing**: Processes emails in user-defined batches (default: 1000/run)
-- **Email Categorization**: Categorizes emails using Gmail labels and content analysis
+- **Email Source Identification**: Focuses on identifying and counting emails by sender
 - **Persistent Tracking**: Maintains processing state between runs
-- **CSV Export**: Generates `email_analysis.csv` with sender statistics
+- **CSV Export**: Generates ```email_analysis.csv``` with sender statistics
 - **Safe Authentication**: OAuth 2.0 with separate credential storage
 
 ## Table of Contents
@@ -54,7 +54,7 @@ pip install -r requirements.txt
 1. Create project in [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable Gmail API
 3. Create OAuth 2.0 Desktop credentials
-4. Download as `credentials.json` to project root
+4. Download as ```credentials.json``` to project root
 
 ### 6. First Run
 ```bash
@@ -85,7 +85,6 @@ python gmail_analyzer.py --export-only
 The CSV file contains:
 - Service/company name
 - Email address
-- Communication type
 - Email count
 - First/last seen timestamps
 
@@ -109,10 +108,10 @@ print(df.sort_values('count', ascending=False).head(10))
 ### File Management
 | File                   | Purpose                                | Security  |
 |------------------------|----------------------------------------|-----------|
-| `credentials.json`    | Google API credentials                 | 🔒 Secret |
-| `gmail_token.pickle`  | Encrypted session tokens               | 🔒 Secret |
-| `processed_ids.pickle`| Tracked email IDs                      | 🔐 Private|
-| `email_analysis.csv`   | Aggregated sender stats                | 🔐 Private|
+| ```credentials.json```    | Google API credentials                 | 🔒 Secret |
+| ```gmail_token.pickle```  | Encrypted session tokens               | 🔒 Secret |
+| ```processed_ids.pickle```| Tracked email IDs                      | 🔐 Private|
+| ```email_analysis.csv```   | Aggregated sender stats                | 🔐 Private|
 
 ### Maintenance
 ```bash
@@ -124,8 +123,9 @@ rm gmail_token.pickle processed_ids.pickle email_analysis.csv
 ```
 
 ### Security
-- Never commit `*.pickle` or `credentials.json`
+- Never commit ```*.pickle``` or ```credentials.json```
 - Revoke access at [Google Security Settings](https://myaccount.google.com/permissions)
 
 ## License
 MIT License - See [LICENSE](LICENSE)
+

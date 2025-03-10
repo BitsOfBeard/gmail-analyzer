@@ -12,7 +12,7 @@ from prettytable import PrettyTable
 
 # Configuration constants
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-BATCH_SIZE = 10000
+BATCH_SIZE = 1000
 CSV_FILENAME = 'email_analysis.csv'
 
 PICKLE_FILENAME = 'processed_ids.pickle'

@@ -1,5 +1,4 @@
 credentials.json
-token.pickle
 gmail_token.pickle
 processed_ids.pickle
 venv/
